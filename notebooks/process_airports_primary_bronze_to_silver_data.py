@@ -6,7 +6,7 @@
 # MAGIC    Changes:
 # MAGIC
 # MAGIC      Developer: Venkat Boyapati / Pradeep Phulari
-# MAGIC      Date Created: 3/1/2023
+# MAGIC      Date Created: 5/1/2023
 # MAGIC      Date updated: 04/14/2023 
 # MAGIC      Purpose: Read NAVAID - ARINC data from Raw zone and Load into Delta-Struct Zone
 

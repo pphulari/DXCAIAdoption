@@ -1,0 +1,37 @@
+name: Databricks PR Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  review:
+    # Skip if a human added this label to opt a PR out of automated review
+    if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip-ai-review') }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r agent/requirements.txt
+
+      - name: Run review agent
+        env:
+          # The default GITHUB_TOKEN is enough for a single-repo MVP.
+          # Swap for a GitHub App installation token once you roll this
+          # out across multiple repos (see README).
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: python agent/review_agent.py

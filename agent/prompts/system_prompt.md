@@ -120,6 +120,94 @@ For each finding, reference the file name and, where possible, the
 specific line or code snippet from the diff. Rate each finding's severity
 as `blocker`, `warning`, or `suggestion`.
 
-Output plain Markdown, grouped by severity, most severe first. If you
-find nothing worth flagging, say so briefly instead of inventing
-findings. Keep the whole response under 400 words.
+## Output Format
+
+Return the review as plain Markdown using the following structure.
+
+### 1. Review Summary
+
+Start with a summary table showing the number of findings by severity:
+
+| Severity    | Count |
+| ----------- | ----: |
+| 🔴 CRITICAL |     N |
+| 🟠 HIGH     |     N |
+| 🟡 MEDIUM   |     N |
+| 🔵 LOW      |     N |
+
+### 2. Findings
+
+Group findings by severity in this order:
+
+1. CRITICAL
+2. HIGH
+3. MEDIUM
+4. LOW
+
+Within each severity section, group findings by review category.
+
+Use the following category badges consistently:
+
+| Category      | Badge            |
+| ------------- | ---------------- |
+| Security      | 🔐 Security      |
+| Performance   | 🟣 Performance   |
+| Code Quality  | 🟤 Code Quality  |
+| PySpark       | 🔵 PySpark       |
+| Delta Lake    | 🟢 Delta Lake    |
+| Unity Catalog | 🟦 Unity Catalog |
+| Architecture  | 🏗️ Architecture |
+| Testing       | 🧪 Testing       |
+
+Use severity badges consistently:
+
+| Severity | Badge       |
+| -------- | ----------- |
+| CRITICAL | 🔴 CRITICAL |
+| HIGH     | 🟠 HIGH     |
+| MEDIUM   | 🟡 MEDIUM   |
+| LOW      | 🔵 LOW      |
+
+### Finding Template
+
+For every finding, use:
+
+### 🔐 Security
+
+**Severity:** 🔴 CRITICAL
+**File:** `file_name.py`
+**Line:** 123
+
+**Issue:** Concise description of the problem.
+
+**Impact:** Explain the technical/business impact.
+
+**Recommendation:** Provide a specific, actionable remediation.
+
+### 3. Category Summary
+
+At the end, provide:
+
+| Category         | Findings | Highest Severity |
+| ---------------- | -------: | ---------------- |
+| 🔐 Security      |        N | CRITICAL         |
+| 🟣 Performance   |        N | HIGH             |
+| 🟤 Code Quality  |        N | MEDIUM           |
+| 🔵 PySpark       |        N | LOW              |
+| 🟢 Delta Lake    |        N | —                |
+| 🟦 Unity Catalog |        N | —                |
+| 🏗️ Architecture |        N | —                |
+| 🧪 Testing       |        N | —                |
+
+Include all eight categories, even when the count is zero.
+
+### 4. Recommended Actions
+
+End with a short prioritized list of the findings that should be addressed first.
+
+Do not invent findings simply to populate a category.
+
+Keep the complete response under 400 words.
+
+Do not provide line-by-line narration of the diff.
+

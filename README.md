@@ -1,4 +1,4 @@
-# Databricks PR review agent — MVP
+# DXC Databricks PR review agent — 
 --------
 Automated first-pass code review for Databricks/PySpark pull requests.
 On every PR open or update, a GitHub Actions workflow sends the diff to

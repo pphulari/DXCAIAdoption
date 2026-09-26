@@ -1,12 +1,12 @@
 # Databricks notebook source
-# MAGIC     %md # process_airports_primary_raw_to_struct_data
+# MAGIC     %md # process_airports_continuation2_raw_to_struct_data
 # MAGIC
-# MAGIC Version History of  process-raw-navig-airport-primary-data
+# MAGIC Version History of  process-raw-navig-airport-continuation2-data
 # MAGIC    
 # MAGIC    Changes:
 # MAGIC
 # MAGIC      Developer: Venkat Boyapati / Pradeep Phulari
-# MAGIC      Date Created: 5/1/2023
+# MAGIC      Date Created: 2/1/2023
 # MAGIC      Date updated: 04/14/2023 
 # MAGIC      Purpose: Read NAVAID - ARINC data from Raw zone and Load into Delta-Struct Zone
 
@@ -17,7 +17,7 @@ from pyspark.sql.functions import monotonically_increasing_id
 from pyspark.sql.functions import current_timestamp
 from pyspark.sql.functions import to_date
 from pyspark.sql.functions import explode
-from pyspark.sql.functions import col,concat
+from pyspark.sql.functions import col
 from pyspark.sql.functions import lit
 from pyspark.sql.functions import input_file_name
 from pyspark.sql.functions import locate, reverse, length, substring
@@ -42,7 +42,7 @@ dbutils.widgets.text("srvc_principle_dir_id","49793faf-eb3f-4d99-a0cf-aef7cce79d
 dbutils.widgets.text("adb_sp_sect_scopename","n-fltcorepkg-sp-secret-scope","DataBricks_Scope_Name")
 dbutils.widgets.text("keyvault_sp_sect_name","ba-n-fltcorepkg-001-sp-secret","Key_Vault_SP_Secret_Name")
 dbutils.widgets.text("keyvault_blob_key_sect_name","blob-storage-access-key","Key_Vault_Blob_Key_Secret_Name")
-dbutils.widgets.text("FILE_CYCLE_RELEAS_NBR","2105","FILE_CYCLE_RELEAS_NBR")
+dbutils.widgets.text("FILE_CYCLE_RELEAS_NBR","2405","FILE_CYCLE_RELEAS_NBR")
 
 # dbutils.widgets.text("param_file_loc","","Parameter_File_Location")
 # dbutils.widgets.text("param_file_name","","Parameter_File_Name")
@@ -98,8 +98,8 @@ RUN_ID = str(get_notebook_run_id())
 NOTEBOOK_JOB_URL = get_notebook_job_url()
 SRC_FILE_NM = get_drain_file_name(base_path + "raw/")
 TARGET_TYPE_CD = "T"
-RT_SUCCESS_PATH = log_base_path + "airport-v18/"
-RT_FAIL_PATH = log_base_path + "airport-18/"
+RT_SUCCESS_PATH = log_base_path + "airport-cr2-v18/"
+RT_FAIL_PATH = log_base_path + "airport-cr2-v18/"
 SUCCESS_PATH = RT_SUCCESS_PATH + "success/"
 FAIL_PATH = RT_FAIL_PATH + "failure/"
 STRUCT_DB_NAME = navig_struct_db_name
@@ -159,41 +159,43 @@ try :
   rawNavigDF = spark.read.text(rawReadPath+src_file_name.rstrip(".txt")+"_"+FILE_CYCLE_RELEAS_NBR+".txt").select(col("value").alias("DATA_RECORD"))
   rawNavigDF.createOrReplaceTempView("rawNavigvw")
   tmpRawNavigDF = spark.sql("""SELECT
-                                substring(DATA_RECORD,1,1) as RecordType,
-                                substring(DATA_RECORD,2,3) as CustomerAreaCode,
-                                substring(DATA_RECORD,5,1) as SectionCode,
-                                substring(DATA_RECORD,6,1) as BlankSpacing1,
-                                substring(DATA_RECORD,7,4) as AirportICAOIdentifier,
-                                substring(DATA_RECORD,11,2) as ICAOCode,
-                                substring(DATA_RECORD,13,1) as SubsectionCode,
-                                substring(DATA_RECORD,14,3) as ATA_IATADesignator,
-                                substring(DATA_RECORD,17,2) as ReservedExpansion,
-                                substring(DATA_RECORD,19,3) as BlankSpacing2,
-                                substring(DATA_RECORD,22,1) as ContinuationRecordNumber,
-                                substring(DATA_RECORD,23,5) as SpeedLimitAltitude,
-                                substring(DATA_RECORD,28,3) as LongestRunway,
-                                substring(DATA_RECORD,31,1) as IFRCapability,
-                                substring(DATA_RECORD,32,1) as LongestRunwaySurfaceCode,
-                                substring(DATA_RECORD,33,9) as AirportReferencePtLatitude,
-                                substring(DATA_RECORD,42,10) as AirportReferencePtLongitude,
-                                substring(DATA_RECORD,52,5) as MagneticVariation,
-                                substring(DATA_RECORD,57,5) as AirportElevation,
-                                substring(DATA_RECORD,62,3) as SpeedLimit,
-                                substring(DATA_RECORD,65,4) as RecommendedNavaid,
-                                substring(DATA_RECORD,69,2) as ICAOCode2,
-                                substring(DATA_RECORD,71,5) as TransitionsAltitude,
-                                substring(DATA_RECORD,76,5) as TransitionLevel,
-                                substring(DATA_RECORD,81,1) as PublicMilitaryIndicator,
-                                substring(DATA_RECORD,82,3) as TimeZone,
-                                substring(DATA_RECORD,85,1) as DaylightIndicator,
-                                substring(DATA_RECORD,86,1) as MagneticTrueIndicator,
-                                substring(DATA_RECORD,87,3) as DatumCode,
-                                substring(DATA_RECORD,90,4) as ReservedExpansion2,
-                                substring(DATA_RECORD,94,30) as AirportName,
-                                substring(DATA_RECORD,124,5) as FileRecordNumber,
-                                substring(DATA_RECORD,129,4) as CycleDate												 
+                                 substring(DATA_RECORD,1,1) as RecordType,
+                                 substring(DATA_RECORD,2,3) as CustomerAreaCode,
+                                 substring(DATA_RECORD,5,1) as SectionCode,
+                                 substring(DATA_RECORD,6,1) as BlankSpacing1,
+                                 substring(DATA_RECORD,7,4) as AirportICAOIdentifier,
+                                 substring(DATA_RECORD,11,2) as ICAOCode,
+                                 substring(DATA_RECORD,13,1) as SubsectionCode,
+                                 substring(DATA_RECORD,14,3) as ATA_IATADesignator,
+                                 substring(DATA_RECORD,17,2) as ReservedExpansion,
+                                 substring(DATA_RECORD,19,3) as BlankSpacing2,
+                                 cast(substring(DATA_RECORD,22,1)as int) as ContinuationRecordNo_CR2,
+                                 substring(DATA_RECORD,23,1) as ApplicationType_CR2,
+                                 substring(DATA_RECORD,24,24) as JS_City_CR2, --Jeppesen Supplemental JS records
+                                 substring(DATA_RECORD,48,2) as JS_State_CR2, --Jeppesen Supplemental JS records
+                                 substring(DATA_RECORD,50,3) as JS_Country_CR2, --Jeppesen Supplemental JS records
+                                 substring(DATA_RECORD,53,14) as JS_ReservedExpansion_CR2, --Jeppesen Supplemental JS records
+                                 substring(DATA_RECORD,67,1) as JS_CTLDARSPIndicator_CR2, --Jeppesen Supplemental JS records
+                                 substring(DATA_RECORD,68,4) as JS_CTLDARSPAirportID_CR2, --Jeppesen Supplemental JS records
+                                 substring(DATA_RECORD,72,2) as JS_CTLDARSPAirportICAO_CR2, --Jeppesen Supplemental JS records
+                                 substring(DATA_RECORD,74,14) as JS_FuelTypes_CR2, --Jeppesen Supplemental JS records
+                                 substring(DATA_RECORD,88,5) as JS_Oxygen_CR2, --Jeppesen Supplemental JS records
+                                 substring(DATA_RECORD,93,6) as JS_Repairs_CR2, --Jeppesen Supplemental JS records
+                                 substring(DATA_RECORD,99,1) as JS_LandingFee_CR2, --Jeppesen Supplemental JS records
+                                 substring(DATA_RECORD,100,4) as JS_PatternAltitude_CR2, --Jeppesen Supplemental JS records
+                                substring(DATA_RECORD,104,1) as JS_JASU_CR2, --Jeppesen Supplemental JS records
+                                substring(DATA_RECORD,105,1) as JS_LLWAS_CR2, --Jeppesen Supplemental JS records
+                                substring(DATA_RECORD,106,1) as JS_BeaconLight_CR2, --Jeppesen Supplemental JS records
+                                substring(DATA_RECORD,107,1) as JS_Customs_CR2, --Jeppesen Supplemental JS records
+                                substring(DATA_RECORD,108,10) as JS_ReservedExpansion2_CR2, --Jeppesen Supplemental JS records
+                                substring(DATA_RECORD,118,1) as JS_SurfaceType_CR2, --Jeppesen Supplemental JS records
+                                substring(DATA_RECORD,119,1) as JS_PublicMilitaryInd_CR2, --Jeppesen Supplemental JS records
+                                substring(DATA_RECORD,120,3) as JS_TimeZone_CR2, --Jeppesen Supplemental JS records
+                                substring(DATA_RECORD,123,1) as JS_DaylightTimeInd_CR2, --Jeppesen Supplemental JS records
+                                substring(DATA_RECORD,124,5) as FileRecordNo_CR2,
+                                substring(DATA_RECORD,129,4) as CycleDate_CR2														 
 																FROM rawNavigvw
-                                WHERE  (SUBSTRING(DATA_RECORD, 22, 1) IN ('0', '1')) AND (concat(SUBSTRING(DATA_RECORD, 5, 1),SUBSTRING(DATA_RECORD, 13, 1)) IN ('PA')) """)
+                                WHERE  (SUBSTRING(DATA_RECORD, 23, 1) IN ('J')) AND (SUBSTRING(DATA_RECORD, 22, 1) IN ('2')) AND(concat(SUBSTRING(DATA_RECORD, 5, 1),SUBSTRING(DATA_RECORD, 13, 1)) IN ('PA')) """)
   tmpRawNavigDF = (tmpRawNavigDF
               .withColumn("UPDT_UTC_TMS", current_timestamp())
               .withColumn("INPUT_FILE_URL", input_file_name())
@@ -210,6 +212,10 @@ except Exception as e:
     log_operational_data(SYS_NM, NOTEBOOK_NM, CLUSTER_NM, CLUSTER_ID, SRC_FILE_NM, TARGET_NM, START_TMS, END_TMS, TARGET_TYPE_CD, STATUS_CD, MSG_DESC, TARGET_ADLS_ZONE, RUN_ID, NOTEBOOK_JOB_URL, SAVE_PATH)
     raise e
   
+
+# COMMAND ----------
+
+# MAGIC %sql describe table navig_dev_struct.airports_continuation2
 
 # COMMAND ----------
 
@@ -237,7 +243,7 @@ log_operational_data(SYS_NM, NOTEBOOK_NM, CLUSTER_NM, CLUSTER_ID, SRC_FILE_NM, T
 
 # DBTITLE 1,Save Airport Continuation 2 Records
 # Save Airport Continuation 2 Records
-table_location = structWritePath + "airports-primary"
+table_location = structWritePath + "airports-continuation2"
 try:
   tmpRawNavigDF\
   .write\
@@ -251,12 +257,12 @@ try:
   # Log the success message 
   SAVE_PATH = SUCCESS_PATH
   STATUS_CD = "S"
-  MSG_DESC = "Airport records has been successfully written in Struct zone"
+  MSG_DESC = "Airways records has been successfully written in Struct zone"
   TARGET_NM = ""
 
 #  log_operational_data(SYS_NM, NOTEBOOK_NM, CLUSTER_NM, CLUSTER_ID, SRC_FILE_NM, TARGET_NM, START_TMS, END_TMS, TARGET_TYPE_CD, STATUS_CD, MSG_DESC, TARGET_ADLS_ZONE, RUN_ID, NOTEBOOK_JOB_URL, SAVE_PATH)
 except Exception as e:
-  MSG_DESC = "Failed to write Airport Primary  records in Struct zone. Error:" + " " + str(e)
+  MSG_DESC = "Failed to write Airport Continuation 2  records in Struct zone. Error:" + " " + str(e)
   END_TMS = str(datetime.now())
   STATUS_CD = "E"
   SAVE_PATH = FAIL_PATH
@@ -267,7 +273,7 @@ except Exception as e:
 # COMMAND ----------
 
 # DBTITLE 1,Create the Airport CR2 delta table (if not already exist) in Struct database
-table_name = "airports_primary"
+table_name = "airports_continuation2"
 try:
   if (sqlContext.sql("show tables in {0}".format(STRUCT_DB_NAME))
       .filter(col("tableName") == table_name)
@@ -280,12 +286,12 @@ try:
     # Log the success message 
     SAVE_PATH = SUCCESS_PATH
     STATUS_CD = "S"
-    MSG_DESC = "Airport primary  Delta table has been successfully created in Struct database"
+    MSG_DESC = "Airport continuation2  Delta table has been successfully created in Struct database"
     TARGET_NM = ""
 
     log_operational_data(SYS_NM, NOTEBOOK_NM, CLUSTER_NM, CLUSTER_ID, SRC_FILE_NM, TARGET_NM, START_TMS, END_TMS, TARGET_TYPE_CD, STATUS_CD, MSG_DESC, TARGET_ADLS_ZONE, RUN_ID, NOTEBOOK_JOB_URL, SAVE_PATH)
 except Exception as e:
-  MSG_DESC = "Failed to create Airport primary Delta table in Struct database. Error:" + " " + str(e)
+  MSG_DESC = "Failed to create Airport continuation2 Delta table in Struct database. Error:" + " " + str(e)
   END_TMS = str(datetime.now())
   STATUS_CD = "E"
   SAVE_PATH = FAIL_PATH
@@ -308,6 +314,3 @@ END_TMS = str(datetime.now())
 TARGET_NM = STRUCT_DB_NAME + "." + table_name
 
 log_operational_data(SYS_NM, NOTEBOOK_NM, CLUSTER_NM, CLUSTER_ID, SRC_FILE_NM, TARGET_NM, START_TMS, END_TMS, TARGET_TYPE_CD, STATUS_CD, MSG_DESC, TARGET_ADLS_ZONE, RUN_ID, NOTEBOOK_JOB_URL, SAVE_PATH)
-
-# COMMAND ----------
-

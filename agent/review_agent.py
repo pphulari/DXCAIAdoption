@@ -102,7 +102,7 @@ def main() -> None:
     review = review_with_claude(diff, changed_files, anthropic_key)
 
     comment_body = (
-        "## Databricks code review (automated)\n\n"
+        "## DXC Databricks Code Review Agent (automated)\n\n"
         f"{review}\n\n"
         "---\n"
         "_Automated first pass — reply here or tag a teammate for anything "

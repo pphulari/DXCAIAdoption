@@ -88,7 +88,7 @@ def main() -> None:
     review = review_with_claude(diff, changed_files, anthropic_key)
 
     comment_body = (
-        "## Databricks code review (automated)\n\n"
+        "## DXC Databricks code review (automated)\n\n"
         f"{review}\n\n"
         "---\n"
         "_This PR is blocked pending human approval of the AI review "

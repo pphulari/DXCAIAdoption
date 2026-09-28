@@ -1,14 +1,14 @@
 # Databricks notebook source
-# MAGIC     %md # process-raw-navig-airways-primary-data
+# DBTITLE 0, 
+# MAGIC     %md # process_ndb_enroute_continuation3_raw_to_struct_data
 # MAGIC
-# MAGIC Version History of  process-raw-navig-airways-primary-data
+# MAGIC Version History of  process_ndb_enroute_continuation3_raw_to_struct_data
 # MAGIC    
 # MAGIC    Changes:
 # MAGIC
-# MAGIC      Developer: Pradeep Phulari / Venkat Boyapati
-# MAGIC      Date Created: 01/04/2023
-# MAGIC      Date updated: 04/14/2023 
-# MAGIC      Purpose: Read NAVAID - Airways data from Raw zone and Load into Delta-Struct Zone
+# MAGIC      Developer: Sivaram / Pradeep Phulari
+# MAGIC      Date Created: 03/25/2024
+# MAGIC      Purpose: Read NAVAID - ARINC data from Raw zone and Load into Delta-Struct Zone
 
 # COMMAND ----------
 
@@ -26,6 +26,10 @@ import json
 
 # COMMAND ----------
 
+
+
+# COMMAND ----------
+
 # DBTITLE 1,Removing all existing widgets
 #Removing all widgets used
 dbutils.widgets.removeAll()
@@ -33,16 +37,16 @@ dbutils.widgets.removeAll()
 # COMMAND ----------
 
 # DBTITLE 1,Create widgets to pass parameters in the Param Notebook to authenticate Blob storage
-# Defining widget with default value and Labelname
-# dbutils.widgets.text("param_file_loc","wasbs://config@baneausstgnavigdev.blob.core.windows.net/","Parameter_File_Location")
+#Defining widget with default value and Labelname
+# dbutils.widgets.text("param_file_loc","wasbs://config@baneausstgnavig.blob.core.windows.net/","Parameter_File_Location")
 # dbutils.widgets.text("param_file_name","navig_properties.json","Parameter_File_Name")
-# dbutils.widgets.text("st_acct_name_config","baneausstgnavigdev","Storage_Account_Name")
+# dbutils.widgets.text("st_acct_name_config","baneausstgnavig","Storage_Account_Name")
 # dbutils.widgets.text("srvc_principle_client_id","897a9154-0fe4-4e6d-b76d-7c80a000f75a","Service_Principle_Client ID")
 # dbutils.widgets.text("srvc_principle_dir_id","49793faf-eb3f-4d99-a0cf-aef7cce79dc1","Service_Princilpe_Directory_ID")
 # dbutils.widgets.text("adb_sp_sect_scopename","n-navig-sp-secret-scope","DataBricks_Scope_Name")
 # dbutils.widgets.text("keyvault_sp_sect_name","ba-n-navig-001-sp-secret","Key_Vault_SP_Secret_Name")
-# dbutils.widgets.text("keyvault_blob_key_sect_name","dev-blob-storage-access-key","Key_Vault_Blob_Key_Secret_Name")
-# dbutils.widgets.text("FILE_CYCLE_RELEAS_NBR","2303","FILE_CYCLE_RELEAS_NBR")
+# dbutils.widgets.text("keyvault_blob_key_sect_name","stage-blob-storage-access-key","Key_Vault_Blob_Key_Secret_Name")
+# dbutils.widgets.text("FILE_CYCLE_RELEAS_NBR","2401","FILE_CYCLE_RELEAS_NBR")
 
 dbutils.widgets.text("param_file_loc","","Parameter_File_Location")
 dbutils.widgets.text("param_file_name","","Parameter_File_Name")
@@ -98,10 +102,10 @@ RUN_ID = str(get_notebook_run_id())
 NOTEBOOK_JOB_URL = get_notebook_job_url()
 SRC_FILE_NM = get_drain_file_name(base_path + "raw/")
 TARGET_TYPE_CD = "T"
-RT_SUCCESS_PATH = log_base_path + "airways-v18/"
-RT_FAIL_PATH = log_base_path + "airways-18/"
-SUCCESS_PATH = RT_SUCCESS_PATH + "success"
-FAIL_PATH = RT_FAIL_PATH + "failure"
+RT_SUCCESS_PATH = log_base_path + "ndb-en-cr3/"
+RT_FAIL_PATH = log_base_path + "ndb-en-cr3/"
+SUCCESS_PATH = RT_SUCCESS_PATH + "success/"
+FAIL_PATH = RT_FAIL_PATH + "failure/"
 STRUCT_DB_NAME = navig_struct_db_name
 
 print('RT_Success Path: ' + RT_SUCCESS_PATH)
@@ -113,6 +117,18 @@ print('Notebook URL: ' + NOTEBOOK_JOB_URL)
 print('Susyem Name: ' + SYS_NM)
 print('Source File Name: ' + SRC_FILE_NM)
 print('Struct DB Name: ' + STRUCT_DB_NAME)
+
+# COMMAND ----------
+
+# Write the first log with start time
+
+# The log will be written in the success folder 
+SAVE_PATH = SUCCESS_PATH
+STATUS_CD = "R"
+MSG_DESC = "Notebook starting"
+print(SAVE_PATH)
+
+log_operational_data(SYS_NM, NOTEBOOK_NM, CLUSTER_NM, CLUSTER_ID, SRC_FILE_NM, TARGET_NM, START_TMS, END_TMS, TARGET_TYPE_CD, STATUS_CD, MSG_DESC, TARGET_ADLS_ZONE, RUN_ID, NOTEBOOK_JOB_URL, SAVE_PATH)
 
 # COMMAND ----------
 
@@ -131,6 +147,7 @@ log_operational_data(SYS_NM, NOTEBOOK_NM, CLUSTER_NM, CLUSTER_ID, SRC_FILE_NM, T
 # DBTITLE 1,Define ADLS Read/Write Data Paths
 # Defining ADLS Paths
 
+#base_path = "abfss://oasis@aabaoriondlsnp.dfs.core.windows.net"
 rawReadPath = navig_raw_path
 structWritePath = navig_deltastruct_path
 
@@ -140,63 +157,49 @@ print("Struct Write Path: " + structWritePath)
 # COMMAND ----------
 
 # DBTITLE 1,Read aalfltkey.txt file from Blob storage/Raw Zone
-  # Read aalfltkey file
+  # Read aalfltkey.txt file
 try :
     rawNavigDF = (spark.read.format("csv").load(rawReadPath+src_file_name.rstrip(".txt")+"_"+FILE_CYCLE_RELEAS_NBR+".txt"))
-    tmpRawNavigDF = rawNavigDF.selectExpr( "substring(_c0,1,1) as RecordType",
-												"substring(_c0,2,3) as CustomerAreaCode",
-												"substring(_c0,5,1) as SectionCode",
-												"substring(_c0,6,1) as SubsectionCode",
-												"substring(_c0,7,7) as BlankSpacing",
-												"substring(_c0,14,5) as RouteIdentifier",
-												"substring(_c0,19,1) as Reserved",
-												"substring(_c0,20,6) as BlankSpacing2",
-												"substring(_c0,26,4) as SequenceNumber",
-												"substring(_c0,30,5) as FixIdentifier",
-												"substring(_c0,35,2) as ICAOCode",
-												"substring(_c0,37,1) as SectionCode2",
-												"substring(_c0,38,1) as SubsectionCode2",
-												"substring(_c0,39,1) as ContinuationRecordNo",
-												"substring(_c0,40,4) as WaypointDescriptionCode",
-												"substring(_c0,44,1) as BoundaryCode",
-												"substring(_c0,45,1) as RouteType",
-												"substring(_c0,46,1) as Level",
-												"substring(_c0,47,1) as DirectionRestriction",
-												"substring(_c0,48,2) as CruiseTableIndicator",
-												"substring(_c0,50,1) as EUIndicator",
-												"substring(_c0,51,4) as RecommendedNAVAID",
-												"substring(_c0,55,2) as ICAOCode2",
-												"substring(_c0,57,3) as RNP",
-												"substring(_c0,60,3) as BlankSpacing3",
-												"substring(_c0,63,4) as Theta",
-												"substring(_c0,67,4) as Rho",
-												"substring(_c0,71,4) as OutboundMagneticCourse",
-												"substring(_c0,75,4) as RouteDistanceFrom",
-												"substring(_c0,79,4) as InboundMagneticCourse",
-												"substring(_c0,83,1) as BlankSpacing4",
-												"substring(_c0,84,5) as MinimumAltitude1",
-												"substring(_c0,89,5) as MinimumAltitude2",
-												"substring(_c0,94,5) as MaximumAltitude3",
-												"substring(_c0,99,3) as FixRadiusTransitionIndicator",
-												"substring(_c0,102,3) as VerticalScaleFactor",
-												"substring(_c0,105,3) as RVSMMinimumLevel",
-												"substring(_c0,108,3) as VSFRVSMMaximumLevel",
-												"substring(_c0,111,4) as Reserved2",
-												"substring(_c0,115,2) as ICAOCode3",
-												"substring(_c0,117,4) as Reserved3",
-												"substring(_c0,121,3) as BlankSpacing5",
-												"substring(_c0,124,5) as FileRecordNo",
-												"substring(_c0,129,4) as CycleDate" ).where( ( col("_c0").substr(39, 1).isin('0','1') )  &  ( col("_c0").substr(5,1) == "E" ) &  ( col("_c0").substr(6,1) == "R" ) )       
- 
+    rawNavigDF=rawNavigDF.selectExpr("_c0 as DATA_RECORD")
+    rawNavigDF.createOrReplaceTempView("rawNavigvw")
+    tmpRawNavigDF = spark.sql("""SELECT
+                                substring(DATA_RECORD,1,1) as RecordType,
+                                substring(DATA_RECORD,2,3) as CustomerAreaCode,
+                                substring(DATA_RECORD,5,1) as SectionCode,
+                                substring(DATA_RECORD,6,1) as SubsectionCode,
+                                substring(DATA_RECORD,7,4) as AirportICAOIdentifier,
+                                substring(DATA_RECORD,11,2) as ICAOCode,
+                                substring(DATA_RECORD,13,1) as BlankSpacing,
+                                substring(DATA_RECORD,14,4) as NDBIdentifier,
+                                substring(DATA_RECORD,18,2) as BlankSpacing2,
+                                substring(DATA_RECORD,20,2) as ICAOCode2,
+                                substring(DATA_RECORD,22,1) as ContinuationRecordNo_CR3,
+                                substring(DATA_RECORD,23,1) as ApplicationType_CR3,
+                                substring(DATA_RECORD,24,4) as FIRIdentifier_CR3,
+                                substring(DATA_RECORD,28,4) as UIRIdentifier_CR3,
+                                substring(DATA_RECORD,32,1) as StartEndIndicator_CR3,
+                                substring(DATA_RECORD,33,11) as BlankSpacing_CR3,
+                                substring(DATA_RECORD,44,80) as ReservedExpansion_CR3,
+                                substring(DATA_RECORD,124,5) as FileRecordNo_CR3,
+                                substring(DATA_RECORD,129,4) as CycleDate_CR3
+
+ --ARINC NDB Enroute Navaid Continuation Records (4.1.3.4)
+--into ARINC424.dbo.[4.1.03.E4_DB_NDB_Enroute_Navaids_3Continuation]
+
+--layout is different in 424-21 compare than 424-18. StartEndIndicator_CR4 is removed in 424-21
+
+FROM            rawNavigvw
+WHERE        (SUBSTRING(DATA_RECORD, 23, 1) IN ('P')) AND (SUBSTRING(DATA_RECORD, 22, 1) IN ('0', '3')) AND SUBSTRING(DATA_RECORD, 5, 1) IN ('D') AND SUBSTRING(DATA_RECORD, 6, 1) IN ('B') """)
+     
   # Create record create date and timestamp, inputfile name column for cycle
     tmpRawNavigDF = (tmpRawNavigDF
               .withColumn("UPDT_UTC_TMS", current_timestamp())
               .withColumn("INPUT_FILE_URL", input_file_name())
              )
     tmpRawNavigDF = tmpRawNavigDF.selectExpr("*", "substr(INPUT_FILE_URL, (length(INPUT_FILE_URL) - locate('/', reverse(INPUT_FILE_URL))) + 2, (length(INPUT_FILE_URL) - locate('/', reverse(INPUT_FILE_URL)))) as INBOUND_FILE_NAME").drop("INPUT_FILE_URL")
-    #tmpRawNavigDF = tmpRawNavigDF.selectExpr("*", "left(right(INBOUND_FILE_NAME, 12),4) as FILE_CYCLE_RELEAS_NBR").drop("INBOUND_FILE_NAME")
+    
     tmpRawNavigDF = tmpRawNavigDF.selectExpr("*","right(regexp_replace(INBOUND_FILE_NAME,'.txt',''),4) as FILE_CYCLE_RELEAS_NBR").drop("INBOUND_FILE_NAME")
-    #tmpRawNavigDF = tmpRawNavigDF.selectExpr("*", "to_date(from_unixtime(unix_timestamp(concat_ws('-', substr(SNAPSHOT_DATE,1,4), substr(SNAPSHOT_DATE,5,2), substr(SNAPSHOT_DATE,7,2)), 'yyyy-MM-dd'), 'yyyy-MM-dd')) as SNAPSHOT_DT").drop("SNAPSHOT_DATE")   
+       
 except Exception as e:
     MSG_DESC = "Failed to read aalfltkey records from Raw zone. Error:" + " " + str(e)
     END_TMS = str(datetime.now())
@@ -213,25 +216,15 @@ except Exception as e:
 # The log will be written in the success folder 
 SAVE_PATH = SUCCESS_PATH
 STATUS_CD = "S"
-MSG_DESC = "All Airways records has been successfully read"
+MSG_DESC = "All ndb enroute continuations3 records has been successfully read"
 
 log_operational_data(SYS_NM, NOTEBOOK_NM, CLUSTER_NM, CLUSTER_ID, SRC_FILE_NM, TARGET_NM, START_TMS, END_TMS, TARGET_TYPE_CD, STATUS_CD, MSG_DESC, TARGET_ADLS_ZONE, RUN_ID, NOTEBOOK_JOB_URL, SAVE_PATH)
 
 # COMMAND ----------
 
-# DBTITLE 1,Get the distinct snapshot date from incoming Airways  data
-# snapshot_dt_from_src = list(tmpRawNavigDF.select("SNAPSHOT_DT").distinct().toPandas()['SNAPSHOT_DT'])
-# if len(snapshot_dt_from_src) != 0:
-#   snapshot_dt = snapshot_dt_from_src[0]
-# else:
-#   snapshot_dt = None  
-# print(snapshot_dt)
-
-# COMMAND ----------
-
-# DBTITLE 1,Save Airways Records
-# Save Airways Records
-table_location = structWritePath + "airways-primary"
+# DBTITLE 1,Save NDB enroute contn3 Records
+# Save NDB enroute contn3 Records
+table_location = structWritePath + "ndb-enroute-continuation3"
 try:
   tmpRawNavigDF\
   .write\
@@ -245,12 +238,12 @@ try:
   # Log the success message 
   SAVE_PATH = SUCCESS_PATH
   STATUS_CD = "S"
-  MSG_DESC = "Airways records has been successfully written in Struct zone"
+  MSG_DESC = "ndb enroute continuation2 records has been successfully written in Struct zone"
   TARGET_NM = ""
 
-#  log_operational_data(SYS_NM, NOTEBOOK_NM, CLUSTER_NM, CLUSTER_ID, SRC_FILE_NM, TARGET_NM, START_TMS, END_TMS, TARGET_TYPE_CD, STATUS_CD, MSG_DESC, TARGET_ADLS_ZONE, RUN_ID, NOTEBOOK_JOB_URL, SAVE_PATH)
+
 except Exception as e:
-  MSG_DESC = "Failed to write Airways records in Struct zone. Error:" + " " + str(e)
+  MSG_DESC = "Failed to write ndb enroute continuation3 records in Struct zone. Error:" + " " + str(e)
   END_TMS = str(datetime.now())
   STATUS_CD = "E"
   SAVE_PATH = FAIL_PATH
@@ -260,11 +253,11 @@ except Exception as e:
 
 # COMMAND ----------
 
-# DBTITLE 1,Create the Airways delta table (if not already exist) in Struct database
-table_name = "airways_primary"
+# DBTITLE 1,Create the NDB enoute contn3 delta table (if not already exist) in Struct database
+table_name = "ndb_enroute_continuation3"
 try:
   if (sqlContext.sql("show tables in {0}".format(STRUCT_DB_NAME))
-      .filter(col("tableName") == table_name)
+      .filter(col("tableName") == table_name )
       .count() <= 0):
         
     sqlContext.sql("create table if not exists {0}.{2} \
@@ -274,12 +267,12 @@ try:
     # Log the success message 
     SAVE_PATH = SUCCESS_PATH
     STATUS_CD = "S"
-    MSG_DESC = "Airways Delta table has been successfully created in Struct database"
+    MSG_DESC = "ndb enroute continuation3  Delta table has been successfully created in Struct database"
     TARGET_NM = ""
 
     log_operational_data(SYS_NM, NOTEBOOK_NM, CLUSTER_NM, CLUSTER_ID, SRC_FILE_NM, TARGET_NM, START_TMS, END_TMS, TARGET_TYPE_CD, STATUS_CD, MSG_DESC, TARGET_ADLS_ZONE, RUN_ID, NOTEBOOK_JOB_URL, SAVE_PATH)
 except Exception as e:
-  MSG_DESC = "Failed to create Airways Delta table in Struct database. Error:" + " " + str(e)
+  MSG_DESC = "Failed to create ndb enroute continuation3 Delta table in Struct database. Error:" + " " + str(e)
   END_TMS = str(datetime.now())
   STATUS_CD = "E"
   SAVE_PATH = FAIL_PATH
@@ -295,7 +288,7 @@ except Exception as e:
 # The log will be written in the success folder 
 SAVE_PATH = SUCCESS_PATH
 STATUS_CD = "S"
-MSG_DESC = "Notebook completed processing all Airways records"
+MSG_DESC = "Notebook completed processing all ndb enroute continuation3 records"
 END_TMS = str(datetime.now())
 
 # Empty the Target Name so that it does not calculate insert/update/delete counts for this log
